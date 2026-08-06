@@ -15,7 +15,6 @@
 </head>
 <body class="bg-[#0B132B] text-slate-100 min-h-screen pb-16">
 
-    <!-- Header -->
     <header class="sticky top-0 z-40 bg-[#0B132B]/90 backdrop-blur-md border-b border-[#E0A96D]/20 px-4 py-3 flex items-center justify-between shadow-2xl">
         <div class="flex items-center space-x-2.5">
             <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#E0A96D] to-[#F4D35E] flex items-center justify-center shadow-lg shadow-[#E0A96D]/30 border border-white/20">
@@ -26,36 +25,9 @@
                 <p class="text-[10px] text-slate-400 tracking-wider uppercase font-semibold">Listings Moderation</p>
             </div>
         </div>
-        <button id="logoutBtn" onclick="logout()" class="hidden w-9 h-9 rounded-full bg-[#1C2541] border border-slate-700 text-slate-300 hover:text-rose-400 hover:border-rose-400/40 flex items-center justify-center transition" title="Lock dashboard">
-            <i class="fa-solid fa-right-from-bracket text-sm"></i>
-        </button>
     </header>
 
-    <!-- PIN Gate -->
-    <div id="gateScreen" class="max-w-sm mx-auto mt-16 px-4">
-        <div class="bg-[#1C2541] border border-slate-700 rounded-3xl p-6 shadow-2xl">
-            <div class="flex items-center space-x-2 mb-4 pb-2 border-b border-slate-700/80">
-                <i class="fa-solid fa-user-shield text-[#E0A96D]"></i>
-                <h3 class="font-bold text-lg text-slate-100">Admin Access</h3>
-            </div>
-            <form onsubmit="handleAdminLogin(event)" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">PIN</label>
-                    <input type="password" id="adminPinInput" required placeholder="Enter admin PIN" class="w-full bg-[#0B132B] border border-slate-700 rounded-xl p-3 text-slate-100 focus:outline-none focus:border-[#E0A96D]" />
-                </div>
-                <p id="adminLoginError" class="text-xs text-rose-400 hidden">Incorrect PIN. Try again.</p>
-                <button type="submit" class="w-full bg-gradient-to-r from-[#E0A96D] to-[#F4D35E] text-[#0B132B] font-bold py-3 rounded-xl shadow-lg hover:opacity-95 transition">
-                    Unlock Dashboard
-                </button>
-            </form>
-        </div>
-        <p class="text-[11px] text-slate-500 text-center mt-4 leading-relaxed">
-            The PIN is checked on the server, not in this page — but it's still worth keeping this URL unlisted so it's not the first thing visitors stumble on.
-        </p>
-    </div>
-
-    <!-- Dashboard -->
-    <main id="dashboardScreen" class="hidden max-w-2xl mx-auto px-4 py-6">
+    <main class="max-w-2xl mx-auto px-4 py-6">
         <div class="flex space-x-2 overflow-x-auto pb-3 scrollbar-none" id="adminTabContainer">
             <button onclick="setAdminTab('pending')" class="admin-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition" data-tab="pending">Pending Review</button>
             <button onclick="setAdminTab('approved')" class="admin-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition" data-tab="approved">Live Listings</button>
@@ -66,62 +38,8 @@
     </main>
 
     <script>
-        // The PIN itself now lives only on the server (Cloudflare env var ADMIN_PIN).
-        // This page just sends what the user types to /api/admin/login and gets a
-        // session token back — nothing secret is stored in this file anymore.
         let currentAdminTab = 'pending';
         let listings = [];
-        let adminToken = sessionStorage.getItem('nkumbaAdminToken') || null;
-
-        async function handleAdminLogin(e) {
-            e.preventDefault();
-            const pin = document.getElementById('adminPinInput').value;
-            const errEl = document.getElementById('adminLoginError');
-            errEl.classList.add('hidden');
-            try {
-                const res = await fetch('/api/admin/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ pin })
-                });
-                if (!res.ok) {
-                    errEl.textContent = 'Incorrect PIN. Try again.';
-                    errEl.classList.remove('hidden');
-                    return;
-                }
-                const data = await res.json();
-                adminToken = data.token;
-                sessionStorage.setItem('nkumbaAdminToken', adminToken);
-                showDashboard();
-            } catch (err) {
-                errEl.textContent = "Couldn't reach the server. Check your connection.";
-                errEl.classList.remove('hidden');
-            }
-        }
-
-        async function logout() {
-            if (adminToken) {
-                try {
-                    await fetch('/api/admin/logout', {
-                        method: 'POST',
-                        headers: { 'Authorization': 'Bearer ' + adminToken }
-                    });
-                } catch (e) { /* best effort */ }
-            }
-            adminToken = null;
-            sessionStorage.removeItem('nkumbaAdminToken');
-            document.getElementById('dashboardScreen').classList.add('hidden');
-            document.getElementById('logoutBtn').classList.add('hidden');
-            document.getElementById('gateScreen').classList.remove('hidden');
-            document.getElementById('adminPinInput').value = '';
-        }
-
-        function showDashboard() {
-            document.getElementById('gateScreen').classList.add('hidden');
-            document.getElementById('dashboardScreen').classList.remove('hidden');
-            document.getElementById('logoutBtn').classList.remove('hidden');
-            setAdminTab(currentAdminTab);
-        }
 
         function setAdminTab(tab) {
             currentAdminTab = tab;
@@ -138,10 +56,7 @@
         async function renderAdminListings() {
             const container = document.getElementById('adminListingsContainer');
             try {
-                const res = await fetch('/api/listings', {
-                    headers: { 'Authorization': 'Bearer ' + adminToken }
-                });
-                if (res.status === 401) { logout(); return; }
+                const res = await fetch('/api/admin/listings');
                 if (!res.ok) throw new Error('Request failed');
                 listings = await res.json();
             } catch (e) {
@@ -188,13 +103,9 @@
             try {
                 const res = await fetch('/api/listings/' + id, {
                     method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + adminToken
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ status })
                 });
-                if (res.status === 401) { logout(); return; }
                 if (!res.ok) throw new Error('Request failed');
                 renderAdminListings();
             } catch (e) {
@@ -205,11 +116,7 @@
         async function adminDeleteListing(id) {
             if (!confirm('Delete this post permanently? This cannot be undone.')) return;
             try {
-                const res = await fetch('/api/listings/' + id, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': 'Bearer ' + adminToken }
-                });
-                if (res.status === 401) { logout(); return; }
+                const res = await fetch('/api/listings/' + id, { method: 'DELETE' });
                 if (!res.ok) throw new Error('Request failed');
                 renderAdminListings();
             } catch (e) {
@@ -217,10 +124,7 @@
             }
         }
 
-        // Stay unlocked across reloads within the same tab session
-        if (adminToken) {
-            showDashboard();
-        }
+        setAdminTab(currentAdminTab);
     </script>
 
     <!-- Footer -->

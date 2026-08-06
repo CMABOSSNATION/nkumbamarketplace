@@ -1,9 +1,6 @@
-import { getSession, json } from '../_utils.js';
+import { json } from '../_utils.js';
 
 export async function onRequestPatch({ request, env, params }) {
-  const session = await getSession(env, request);
-  if (!session) return json({ error: 'Unauthorized' }, 401);
-
   let body;
   try {
     body = await request.json();
@@ -27,10 +24,7 @@ export async function onRequestPatch({ request, env, params }) {
   return json({ success: true });
 }
 
-export async function onRequestDelete({ request, env, params }) {
-  const session = await getSession(env, request);
-  if (!session) return json({ error: 'Unauthorized' }, 401);
-
+export async function onRequestDelete({ env, params }) {
   await env.DB.prepare('DELETE FROM listings WHERE id = ?').bind(params.id).run();
   return json({ success: true });
 }
